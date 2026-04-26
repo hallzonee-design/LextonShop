@@ -798,6 +798,70 @@ def search_start(message):
     msg = bot.send_message(uid, "🔍 Введи запрос:\n• Телефон: +79001234567\n• Email: user@mail.ru\n• Username: @user")
     bot.register_next_step_handler(msg, lambda m: mega_search(m, uid))
 
+def mega_search_single(message, uid, qtype):
+    query = message.text.strip()
+    clean = query.lstrip('@')
+    if qtype == "phone": clean = ''.join(filter(str.isdigit, clean))
+    
+    loading = bot.send_message(uid, f"🔍 Поиск {qtype}...\n⏳ ~60-90 сек\n[░░░░░░░░░░░░░░░░░░░░] 0%", parse_mode="Markdown")
+    
+    def run():
+        try:
+            for p in range(10, 101, 10):
+                bar = "█" * (p // 5) + "░" * (20 - p // 5)
+                try: bot.edit_message_text(f"🔍 Поиск...\n⏳ {p}%\n[{bar}] {p}%", uid, loading.message_id)
+                except: pass
+                time.sleep(2)
+            
+            if qtype == "phone": results = search_phone(clean); report = format_report(results, "phone")
+            elif qtype == "email": results = search_email(clean); report = format_report(results, "email")
+            else: results = search_username(clean); report = format_report(results, "username")
+            
+            if len(report) > 4000:
+                parts = [report[i:i+4000] for i in range(0, len(report), 4000)]
+                for i, part in enumerate(parts):
+                    if i == 0: bot.edit_message_text(part, uid, loading.message_id, parse_mode="Markdown")
+                    else: bot.send_message(uid, part, parse_mode="Markdown")
+            else:
+                bot.edit_message_text(report, uid, loading.message_id, parse_mode="Markdown")
+        except Exception as e:
+            try: bot.edit_message_text(f"❌ Ошибка: {str(e)[:100]}", uid, loading.message_id)
+            except: pass
+    
+    threading.Thread(target=run).start()
+
+def mega_search_person(message, uid):
+    query = message.text.strip()
+    loading = bot.send_message(uid, "🔍 Поиск человека...\n⏳ ~90 сек\n[░░░░░░░░░░░░░░░░░░░░] 0%", parse_mode="Markdown")
+    
+    def run():
+        try:
+            for p in range(10, 101, 10):
+                bar = "█" * (p // 5) + "░" * (20 - p // 5)
+                try: bot.edit_message_text(f"🔍 Поиск...\n⏳ {p}%\n[{bar}] {p}%", uid, loading.message_id)
+                except: pass
+                time.sleep(2)
+            
+            r1 = search_by_fullname(query)
+            r2 = search_people_yandex(query)
+            r3 = search_relatives(query)
+            r4 = search_work_history(query)
+            r5 = search_education(query)
+            r6 = search_financial(query)
+            
+            report = format_life_report(r1, "people") + "\n" + format_life_report(r3, "relatives") + "\n" + format_life_report(r4, "work") + "\n" + format_life_report(r5, "education") + "\n" + format_life_report(r6, "finance")
+            
+            for i in range(0, len(report), 4000):
+                part = report[i:i+4000]
+                if i == 0: bot.edit_message_text(part, uid, loading.message_id, parse_mode="Markdown")
+                else: bot.send_message(uid, part, parse_mode="Markdown")
+        except Exception as e:
+            try: bot.edit_message_text(f"❌ Ошибка: {str(e)[:100]}", uid, loading.message_id)
+            except: pass
+    
+    threading.Thread(target=run).start()
+
+
 def mega_search(message, uid):
     query = message.text.strip()
     clean = query.lstrip('@')
@@ -1428,56 +1492,111 @@ def search_social_media_complete(query):
     results = {"query": query, "findings": [], "profiles": []}
     
     platforms = [
-        ("Facebook", f"https://www.facebook.com/{query}"),
-        ("Instagram", f"https://www.instagram.com/{query}"),
+        ("Telegram", f"https://t.me/{query}"),
+        ("VK", f"https://vk.com/{query}"),
+        ("GitHub", f"https://api.github.com/users/{query}"),
         ("Twitter", f"https://twitter.com/{query}"),
-        ("LinkedIn", f"https://www.linkedin.com/in/{query}"),
-        ("TikTok", f"https://www.tiktok.com/@{query}"),
-        ("Snapchat", f"https://www.snapchat.com/add/{query}"),
-        ("Pinterest", f"https://www.pinterest.com/{query}"),
+        ("Instagram", f"https://www.instagram.com/{query}"),
         ("Reddit", f"https://www.reddit.com/user/{query}"),
         ("Twitch", f"https://www.twitch.tv/{query}"),
-        ("YouTube", f"https://www.youtube.com/@{query}"),
-        ("GitHub", f"https://github.com/{query}"),
+        ("TikTok", f"https://www.tiktok.com/@{query}"),
         ("Steam", f"https://steamcommunity.com/id/{query}"),
+        ("YouTube", f"https://www.youtube.com/@{query}"),
         ("Spotify", f"https://open.spotify.com/user/{query}"),
+        ("Pinterest", f"https://www.pinterest.com/{query}"),
+        ("Snapchat", f"https://www.snapchat.com/add/{query}"),
         ("SoundCloud", f"https://soundcloud.com/{query}"),
-        ("Medium", f"https://medium.com/@{query}"),
         ("Patreon", f"https://www.patreon.com/{query}"),
-        ("Behance", f"https://www.behance.net/{query}"),
-        ("Dribbble", f"https://dribbble.com/{query}"),
+        ("Linktree", f"https://linktr.ee/{query}"),
         ("Flickr", f"https://www.flickr.com/people/{query}"),
         ("DeviantArt", f"https://www.deviantart.com/{query}"),
-        ("Keybase", f"https://keybase.io/{query}"),
-        ("ProductHunt", f"https://www.producthunt.com/@{query}"),
-        ("HackerNews", f"https://news.ycombinator.com/user?id={query}"),
-        ("Vimeo", f"https://vimeo.com/{query}"),
-        ("About.me", f"https://about.me/{query}"),
-        ("Mixcloud", f"https://www.mixcloud.com/{query}"),
-        ("Slideshare", f"https://www.slideshare.net/{query}"),
-        ("Issuu", f"https://issuu.com/{query}"),
-        ("BuzzFeed", f"https://www.buzzfeed.com/{query}"),
-        ("Wattpad", f"https://www.wattpad.com/user/{query}"),
+        ("Medium", f"https://medium.com/@{query}"),
+        ("Facebook", f"https://www.facebook.com/{query}"),
     ]
     
     for site, url in platforms:
         try:
-            r = requests.get(url, timeout=4, headers=H, allow_redirects=True)
+            r = requests.get(url, timeout=5, headers=H, allow_redirects=True)
             if r.status_code == 200 and len(r.text) > 500:
-                title_match = re.search(r'<meta property="og:title" content="(.*?)">', r.text) or re.search(r'<title>(.*?)</title>', r.text)
+                # Ищем заголовок
+                title_match = re.search(r'<meta property="og:title" content="(.*?)">', r.text)
+                if not title_match:
+                    title_match = re.search(r'<title>(.*?)</title>', r.text)
+                
+                # Ищем описание
+                desc_match = re.search(r'<meta property="og:description" content="(.*?)">', r.text)
+                
                 if title_match:
                     title = title_match.group(1).strip()
-                    bad = ['Error', 'Not Found', '404', 'Page Not Found', 'не найден']
-                    if not any(b.lower() in title.lower() for b in bad) and title.lower() != query.lower():
-                        results["profiles"].append({"site": site, "url": url, "title": title[:150]})
+                    bad = ['Error', 'Not Found', '404', 'Page Not Found']
+                    if not any(b.lower() in title.lower() for b in bad):
+                        profile_data = {"site": site, "url": url, "title": title[:150]}
+                        if desc_match:
+                            profile_data["desc"] = desc_match.group(1)[:200]
+                        results["profiles"].append(profile_data)
         except: pass
+    
+    # GitHub API детально
+    try:
+        r = requests.get(f"https://api.github.com/users/{query}", timeout=5, headers=H)
+        if r.status_code == 200:
+            d = r.json()
+            if d.get('login'):
+                results["findings"].append({
+                    "source": "github_details",
+                    "name": d.get('name') or d.get('login'),
+                    "bio": d.get('bio', '')[:200],
+                    "location": d.get('location', ''),
+                    "repos": d.get('public_repos', 0),
+                    "followers": d.get('followers', 0),
+                    "email": d.get('email', 'скрыт'),
+                    "blog": d.get('blog', '')
+                })
+    except: pass
     
     try:
         r = requests.get(f"https://haveibeenpwned.com/api/v3/breachedaccount/{query}", timeout=5, headers=H)
-        if r.status_code == 200: results["findings"].append({"source": "leaks", "breaches": r.json()[:10]})
+        if r.status_code == 200:
+            results["findings"].append({"source": "leaks", "breaches": r.json()[:10]})
     except: pass
     
     return results
+
+def format_social_report(results):
+    lines = []
+    lines.append("🔍 **СОЦИАЛЬНЫЙ ПОИСК:** " + results.get("query", ""))
+    lines.append("")
+    
+    profiles = results.get("profiles", [])
+    if profiles:
+        lines.append(f"📱 Найдено {len(profiles)} профилей:\n")
+        for p in profiles:
+            lines.append(f"✅ **{p['site']}**: {p['title']}")
+            if p.get('desc'):
+                lines.append(f"   📝 {p['desc']}")
+            lines.append("")
+    
+    findings = results.get("findings", [])
+    for f in findings:
+        if f.get("source") == "github_details":
+            lines.append("💻 **GitHub детально:**")
+            lines.append(f"├ Имя: {f.get('name', '?')}")
+            if f.get('bio'): lines.append(f"├ Bio: {f['bio']}")
+            if f.get('location'): lines.append(f"├ Локация: {f['location']}")
+            lines.append(f"├ Репозиториев: {f.get('repos', 0)}")
+            lines.append(f"├ Фолловеров: {f.get('followers', 0)}")
+            if f.get('email') and f['email'] != 'скрыт': lines.append(f"├ Email: {f['email']}")
+            if f.get('blog'): lines.append(f"└ Сайт: {f['blog']}")
+            lines.append("")
+        elif f.get("source") == "leaks" and f.get("breaches"):
+            lines.append(f"🔓 Утечек: {len(f['breaches'])}")
+            for b in f['breaches'][:7]:
+                if isinstance(b, dict):
+                    lines.append(f"├ {b.get('Name','?')} ({b.get('BreachDate','?')[:10]})")
+            lines.append("")
+    
+    lines.append("🔍 **Lexton Mega OSINT**")
+    return "\n".join(lines)
 
 def format_social_report(results):
     lines = []
